@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.0"
+  },
+  "name": "desktop",
+  "version": "1.0.0",
+  "description": "",
+  "main": "clima.js",
+  "devDependencies": {},
+  "scripts": {
+    "start": "node clima.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
