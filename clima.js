@@ -59,15 +59,15 @@ const servidor = http.createServer(async (req, res) => {
                 if (condicionClima === 'Rain') {
                     idCampaña = "CMP_INDOOR_01";
                     tituloCampaña = "Accesorios Indoor y Overgrips";
-                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"; 
+                    videoUrl = "https://www.w3schools.com/html/mov_bbb.mp4"; 
                 } else if (temperatura >= 28) {
                     idCampaña = "CMP_VINTAGE_01";
                     tituloCampaña = "Playeras Padel Junky 100% Algodón Vintage";
-                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"; 
+                    videoUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4"; 
                 } else {
                     idCampaña = "CMP_DEADSTOCK_01";
                     tituloCampaña = "Liquidación Flash Palas y Mochilas";
-                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; 
+                    videoUrl = "https://media.w3.org/2010/05/video/movie_300.mp4"; 
                 }
 
               
