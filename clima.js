@@ -54,20 +54,23 @@ const servidor = http.createServer(async (req, res) => {
                 let videoUrl = "";
                 let idCampaña = "";
 
+            
                 // --- MOTOR DE DECISIÓN ---
                 if (condicionClima === 'Rain') {
                     idCampaña = "CMP_INDOOR_01";
                     tituloCampaña = "Accesorios Indoor y Overgrips";
-                    videoUrl = "https://midominio.com/videos/accesorios-indoor-padel.mp4";
+                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"; 
                 } else if (temperatura >= 28) {
                     idCampaña = "CMP_VINTAGE_01";
                     tituloCampaña = "Playeras Padel Junky 100% Algodón Vintage";
-                    videoUrl = "https://midominio.com/videos/padel-junky-vintage-1080p.mp4";
+                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"; 
                 } else {
                     idCampaña = "CMP_DEADSTOCK_01";
                     tituloCampaña = "Liquidación Flash Palas y Mochilas";
-                    videoUrl = "https://midominio.com/videos/liquidacion-stock-mochilas.mp4";
+                    videoUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; 
                 }
+
+              
 
                 const xmlVAST = generarVAST(idCampaña, tituloCampaña, videoUrl);
 
@@ -90,7 +93,10 @@ const servidor = http.createServer(async (req, res) => {
                     console.log(`✅ Proof of Play guardado en tabla 'prueba_de_juego': [${tituloCampaña}] a ${temperatura}°C`);
                 }
 
-                res.writeHead(200, { 'Content-Type': 'application/xml' });
+                res.writeHead(200, { 
+                    'Content-Type': 'application/xml',
+                    'Access-Control-Allow-Origin': '*' // ¡Esto permite que cualquier pantalla del mundo lo lea!
+                });
                 res.end(xmlVAST);
                 
             } else {
