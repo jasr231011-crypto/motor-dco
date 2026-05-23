@@ -59,15 +59,15 @@ const servidor = http.createServer(async (req, res) => {
                 if (condicionClima === 'Rain') {
                     idCampaña = "CMP_INDOOR_01";
                     tituloCampaña = "Accesorios Indoor y Overgrips";
-                    videoUrl = "https://www.w3schools.com/html/mov_bbb.mp4"; 
+                    videoUrl = "https://jodncjucnpwvwaxhnjex.supabase.co/storage/v1/object/public/inventario-videos/campanas-clima/lluvia.mp4"; 
                 } else if (temperatura >= 28) {
                     idCampaña = "CMP_VINTAGE_01";
                     tituloCampaña = "Playeras Padel Junky 100% Algodón Vintage";
-                    videoUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4"; 
+                    videoUrl = "https://jodncjucnpwvwaxhnjex.supabase.co/storage/v1/object/public/inventario-videos/campanas-clima/calor.mp4"; 
                 } else {
                     idCampaña = "CMP_DEADSTOCK_01";
                     tituloCampaña = "Liquidación Flash Palas y Mochilas";
-                    videoUrl = "https://media.w3.org/2010/05/video/movie_300.mp4"; 
+                    videoUrl = "https://jodncjucnpwvwaxhnjex.supabase.co/storage/v1/object/public/inventario-videos/campanas-clima/normal.mp4"; 
                 }
 
               
