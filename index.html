@@ -86,6 +86,64 @@ requestDB.onsuccess = function(event) {
 requestDB.onerror = function(event) {
     console.error("Error al abrir la base de datos local:", event.target.error);
 };
+// Función para descargar un video y guardarlo en la base de datos
+async function descargarYGuardarVideo(urlVideo, idVideo) {
+    try {
+        console.log("Descargando video desde:", urlVideo);
+        const response = await fetch(urlVideo);
+        
+        if (!response.ok) throw new Error('Error al descargar el video');
+        
+        // Convertimos el video a un objeto Blob (datos binarios)
+        const blob = await response.blob();
+        
+        // Abrimos una transacción de escritura en el Músculo Offline
+        const transaction = dbOffline.transaction(['videos'], 'readwrite');
+        const objectStore = transaction.objectStore('videos');
+        
+        // Guardamos el video con su ID correspondiente
+        const request = objectStore.put({ id: idVideo, videoBlob: blob });
+        
+        request.onsuccess = function() {
+            console.log("¡Video guardado con éxito en el Músculo Offline!", idVideo);
+            // Ahora que está guardado, podemos reproducirlo desde local
+            reproducirDesdeLocal(idVideo);
+        };
+        
+        request.onerror = function(event) {
+            console.error("Error al guardar el video en la base de datos:", event.target.error);
+        };
+        
+    } catch (error) {
+        console.error("Fallo en la descarga:", error);
+    }
+}
+
+// Función para reproducir el video desde la base de datos
+function reproducirDesdeLocal(idVideo) {
+    const transaction = dbOffline.transaction(['videos'], 'readonly');
+    const objectStore = transaction.objectStore('videos');
+    
+    const request = objectStore.get(idVideo);
+    
+    request.onsuccess = function(event) {
+        const resultado = event.target.result;
+        if (resultado) {
+            console.log("Reproduciendo video desde el Músculo Offline...");
+            // Creamos una URL temporal para el Blob binario y la asignamos al reproductor
+            const videoURL = URL.createObjectURL(resultado.videoBlob);
+            reproductor.src = videoURL;
+            reproductor.play();
+        } else {
+            console.log("Video no encontrado en la base de datos local. Descargando de nuevo...");
+            // Manejar la lógica de respaldo si no está guardado
+        }
+    };
+    
+    request.onerror = function(event) {
+        console.error("Error al leer el video local:", event.target.error);
+    };
+}
     </script>
 
 </body>
