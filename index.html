@@ -2,43 +2,121 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Reproductor pDOOH</title>
+    <title>Reproductor DOOH</title>
     <style>
-        /* Esto quita los márgenes y hace que el video ocupe toda la pantalla y el fondo sea negro */
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
         video { width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body>
-
+    
     <video id="pantalla" autoplay muted></video>
 
     <script>
-        // Aquí conectamos con tu nube pública
         const URL_MOTOR = 'https://motor-dco-mexico.onrender.com/anuncio';
         const reproductor = document.getElementById('pantalla');
 
+        // ==========================================
+        // FASE 2: EL MÚSCULO OFFLINE (IndexedDB)
+        // ==========================================
+        let dbOffline; 
+        const requestDB = indexedDB.open("MotorDCO_DB", 1);
+
+        requestDB.onupgradeneeded = function(event) {
+            dbOffline = event.target.result;
+            if (!dbOffline.objectStoreNames.contains('videos')) {
+                dbOffline.createObjectStore('videos', { keyPath: 'id' });
+                console.log("¡Bóveda construida! Almacén de videos listo.");
+            }
+        };
+
+        requestDB.onsuccess = function(event) {
+            dbOffline = event.target.result;
+            console.log("Conexión exitosa al Músculo Offline. El sistema está listo.");
+            
+            // ¡IMPORTANTE! Solo arrancamos a pedir anuncios cuando la bóveda ya abrió
+            cargarAnuncio();
+        };
+
+        requestDB.onerror = function(event) {
+            console.error("Error al abrir la base de datos local:", event.target.error);
+        };
+
+        // ==========================================
+        // FUNCIONES DE DESCARGA Y REPRODUCCIÓN
+        // ==========================================
+        async function descargarYGuardarVideo(urlVideo, idVideo) {
+            try {
+                console.log("Descargando video de internet para guardarlo...");
+                const response = await fetch(urlVideo);
+                if (!response.ok) throw new Error('Error al descargar el video');
+                
+                const blob = await response.blob();
+                const transaction = dbOffline.transaction(['videos'], 'readwrite');
+                const objectStore = transaction.objectStore('videos');
+                
+                const request = objectStore.put({ id: idVideo, videoBlob: blob });
+                
+                request.onsuccess = function() {
+                    console.log("¡Video guardado con éxito en la bóveda!");
+                    reproducirDesdeLocal(idVideo);
+                };
+            } catch (error) {
+                console.error("Fallo en la descarga:", error);
+                setTimeout(cargarAnuncio, 5000); // Si falla, intenta con otro en 5 seg
+            }
+        }
+
+        function reproducirDesdeLocal(idVideo) {
+            const transaction = dbOffline.transaction(['videos'], 'readonly');
+            const objectStore = transaction.objectStore('videos');
+            const request = objectStore.get(idVideo);
+            
+            request.onsuccess = function(event) {
+                const resultado = event.target.result;
+                if (resultado) {
+                    console.log("Reproduciendo sin internet (desde local)...");
+                    const videoURL = URL.createObjectURL(resultado.videoBlob);
+                    reproductor.src = videoURL;
+                    reproductor.play();
+                }
+            };
+        }
+
+        // ==========================================
+        // EL CEREBRO: CARGAR EL ANUNCIO
+        // ==========================================
         async function cargarAnuncio() {
             try {
                 console.log("Solicitando campaña al servidor DCO...");
                 const respuesta = await fetch(URL_MOTOR);
                 const textoXML = await respuesta.text();
 
-                // Convertir el texto a un formato XML que podamos leer
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(textoXML, "text/xml");
-
-                // Buscar la etiqueta <MediaFile> donde guardamos la URL del video
                 const mediaFile = xmlDoc.getElementsByTagName("MediaFile")[0];
-                
+
                 if (mediaFile) {
-                    // Extraer el texto puro sin los símbolos raros de CDATA
                     const videoUrl = mediaFile.textContent.trim();
-                    console.log("Campaña recibida. Reproduciendo:", videoUrl);
-                    
-                    // Inyectar el video en la pantalla
-                    reproductor.src = videoUrl;
-                    reproductor.play();
+                    // Usamos la misma URL como el ID (nombre) del archivo en nuestra bóveda
+                    const idVideo = videoUrl;
+
+                    // Vamos a revisar la bóveda primero
+                    const transaction = dbOffline.transaction(['videos'], 'readonly');
+                    const objectStore = transaction.objectStore('videos');
+                    const request = objectStore.get(idVideo);
+
+                    request.onsuccess = function(event) {
+                        if (event.target.result) {
+                            // SI YA ESTÁ GUARDADO
+                            console.log("El video ya está en la bóveda. No gastaremos internet.");
+                            reproducirDesdeLocal(idVideo);
+                        } else {
+                            // SI NO ESTÁ GUARDADO
+                            console.log("Video nuevo detectado. Vamos a descargarlo.");
+                            descargarYGuardarVideo(videoUrl, idVideo);
+                        }
+                    };
                 } else {
                     console.log("No se encontró video en el VAST. Reintentando en 5 segundos...");
                     setTimeout(cargarAnuncio, 5000);
@@ -49,102 +127,9 @@
             }
         }
 
-        // Esta es la magia del ciclo infinito: cuando el video termine, pide otro
+        // Cuando termine un video, el ciclo vuelve a empezar
         reproductor.addEventListener('ended', cargarAnuncio);
 
-        // Arranque inicial
-        cargarAnuncio();
-// ==========================================
-// FASE 2: EL MÚSCULO OFFLINE (IndexedDB)
-// ==========================================
-
-// Variable global para almacenar nuestra base de datos
-let dbOffline; 
-
-// Solicitamos abrir (o crear) la base de datos 'MotorDCO_DB' en su versión 1
-const requestDB = indexedDB.open("MotorDCO_DB", 1);
-
-// 1. SI ES LA PRIMERA VEZ QUE SE ABRE (Construyendo la bóveda)
-requestDB.onupgradeneeded = function(event) {
-    dbOffline = event.target.result;
-    
-    // Creamos el almacén llamado 'videos'. Aquí guardaremos los MP4.
-    // Usamos 'id' como la llave principal para buscar cada comercial.
-    if (!dbOffline.objectStoreNames.contains('videos')) {
-        dbOffline.createObjectStore('videos', { keyPath: 'id' });
-        console.log("¡Bóveda construida! Almacén de videos listo.");
-    }
-};
-
-// 2. SI LA BASE DE DATOS SE ABRE CON ÉXITO
-requestDB.onsuccess = function(event) {
-    dbOffline = event.target.result;
-    console.log("Conexión exitosa al Músculo Offline. El sistema está listo para guardar en disco local.");
-};
-
-// 3. SI HAY UN ERROR (Ej. Modo incógnito muy estricto)
-requestDB.onerror = function(event) {
-    console.error("Error al abrir la base de datos local:", event.target.error);
-};
-// Función para descargar un video y guardarlo en la base de datos
-async function descargarYGuardarVideo(urlVideo, idVideo) {
-    try {
-        console.log("Descargando video desde:", urlVideo);
-        const response = await fetch(urlVideo);
-        
-        if (!response.ok) throw new Error('Error al descargar el video');
-        
-        // Convertimos el video a un objeto Blob (datos binarios)
-        const blob = await response.blob();
-        
-        // Abrimos una transacción de escritura en el Músculo Offline
-        const transaction = dbOffline.transaction(['videos'], 'readwrite');
-        const objectStore = transaction.objectStore('videos');
-        
-        // Guardamos el video con su ID correspondiente
-        const request = objectStore.put({ id: idVideo, videoBlob: blob });
-        
-        request.onsuccess = function() {
-            console.log("¡Video guardado con éxito en el Músculo Offline!", idVideo);
-            // Ahora que está guardado, podemos reproducirlo desde local
-            reproducirDesdeLocal(idVideo);
-        };
-        
-        request.onerror = function(event) {
-            console.error("Error al guardar el video en la base de datos:", event.target.error);
-        };
-        
-    } catch (error) {
-        console.error("Fallo en la descarga:", error);
-    }
-}
-
-// Función para reproducir el video desde la base de datos
-function reproducirDesdeLocal(idVideo) {
-    const transaction = dbOffline.transaction(['videos'], 'readonly');
-    const objectStore = transaction.objectStore('videos');
-    
-    const request = objectStore.get(idVideo);
-    
-    request.onsuccess = function(event) {
-        const resultado = event.target.result;
-        if (resultado) {
-            console.log("Reproduciendo video desde el Músculo Offline...");
-            // Creamos una URL temporal para el Blob binario y la asignamos al reproductor
-            const videoURL = URL.createObjectURL(resultado.videoBlob);
-            reproductor.src = videoURL;
-            reproductor.play();
-        } else {
-            console.log("Video no encontrado en la base de datos local. Descargando de nuevo...");
-            // Manejar la lógica de respaldo si no está guardado
-        }
-    };
-    
-    request.onerror = function(event) {
-        console.error("Error al leer el video local:", event.target.error);
-    };
-}
     </script>
-
 </body>
 </html>
