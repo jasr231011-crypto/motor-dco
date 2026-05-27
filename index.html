@@ -54,6 +54,38 @@
 
         // Arranque inicial
         cargarAnuncio();
+// ==========================================
+// FASE 2: EL MÚSCULO OFFLINE (IndexedDB)
+// ==========================================
+
+// Variable global para almacenar nuestra base de datos
+let dbOffline; 
+
+// Solicitamos abrir (o crear) la base de datos 'MotorDCO_DB' en su versión 1
+const requestDB = indexedDB.open("MotorDCO_DB", 1);
+
+// 1. SI ES LA PRIMERA VEZ QUE SE ABRE (Construyendo la bóveda)
+requestDB.onupgradeneeded = function(event) {
+    dbOffline = event.target.result;
+    
+    // Creamos el almacén llamado 'videos'. Aquí guardaremos los MP4.
+    // Usamos 'id' como la llave principal para buscar cada comercial.
+    if (!dbOffline.objectStoreNames.contains('videos')) {
+        dbOffline.createObjectStore('videos', { keyPath: 'id' });
+        console.log("¡Bóveda construida! Almacén de videos listo.");
+    }
+};
+
+// 2. SI LA BASE DE DATOS SE ABRE CON ÉXITO
+requestDB.onsuccess = function(event) {
+    dbOffline = event.target.result;
+    console.log("Conexión exitosa al Músculo Offline. El sistema está listo para guardar en disco local.");
+};
+
+// 3. SI HAY UN ERROR (Ej. Modo incógnito muy estricto)
+requestDB.onerror = function(event) {
+    console.error("Error al abrir la base de datos local:", event.target.error);
+};
     </script>
 
 </body>
