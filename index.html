@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Reproductor DOOH</title>
+    <title>Motor DCO - Reproductor Autónomo</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -17,54 +17,105 @@
         const reproductor = document.getElementById('pantalla');
 
         // ==========================================
-        // FASE 2: EL MÚSCULO OFFLINE (IndexedDB)
+        // LA BÓVEDA (IndexedDB)
         // ==========================================
         let dbOffline; 
-        const requestDB = indexedDB.open("MotorDCO_DB", 1);
+        const requestDB = indexedDB.open("MotorDCO_DB", 2); // Versión 2
 
         requestDB.onupgradeneeded = function(event) {
             dbOffline = event.target.result;
-            if (!dbOffline.objectStoreNames.contains('videos')) {
-                dbOffline.createObjectStore('videos', { keyPath: 'id' });
-                console.log("¡Bóveda construida! Almacén de videos listo.");
+            if (dbOffline.objectStoreNames.contains('videos')) {
+                dbOffline.deleteObjectStore('videos');
             }
+            dbOffline.createObjectStore('videos', { keyPath: 'id' });
         };
 
         requestDB.onsuccess = function(event) {
             dbOffline = event.target.result;
-            console.log("Conexión exitosa al Músculo Offline. El sistema está listo.");
-            
-            // ¡IMPORTANTE! Solo arrancamos a pedir anuncios cuando la bóveda ya abrió
-            cargarAnuncio();
+            console.log("Bóveda lista y operativa.");
+            cargarAnuncio(); 
         };
 
         requestDB.onerror = function(event) {
-            console.error("Error al abrir la base de datos local:", event.target.error);
+            console.error("Error en la bóveda:", event.target.error);
         };
 
         // ==========================================
-        // FUNCIONES DE DESCARGA Y REPRODUCCIÓN
+        // MANTENIMIENTO EN SEGUNDO PLANO (TURNO DE DÍA)
         // ==========================================
-        async function descargarYGuardarVideo(urlVideo, idVideo) {
+        function rondaDeLimpiezaSilenciosa() {
+            if (!dbOffline) return; 
+            
+            console.log("🧹 Conserje: Iniciando ronda de limpieza en segundo plano...");
+            const transaction = dbOffline.transaction(['videos'], 'readwrite');
+            const objectStore = transaction.objectStore('videos');
+            const request = objectStore.getAll();
+
+            request.onsuccess = function(event) {
+                const videos = event.target.result;
+                if (videos && videos.length > 0) {
+                    const AHORA = Date.now();
+                    let basuraEliminada = 0;
+
+                    videos.forEach(video => {
+                        if (AHORA > video.fechaCaducidad) {
+                            objectStore.delete(video.id);
+                            console.log(`🗑️ Eliminado en rutina: ${video.id}`);
+                            basuraEliminada++;
+                        }
+                    });
+
+                    if (basuraEliminada === 0) {
+                        console.log("✨ Bóveda impecable. No hay basura que sacar.");
+                    }
+                }
+            };
+        }
+
+        // Programado para limpiar cada 1 hora (3,600,000 ms) sin interrumpir la pantalla
+        setInterval(rondaDeLimpiezaSilenciosa, 3600000);
+
+        // ==========================================
+        // FUNCIONES DE DESCARGA Y GUARDADO INTELIGENTE
+        // ==========================================
+        async function descargarYGuardarVideo(urlVideo, idVideo, fechaCaducidadCalculada) {
             try {
-                console.log("Descargando video de internet para guardarlo...");
+                console.log("Descargando video nuevo a la bóveda...");
                 const response = await fetch(urlVideo);
-                if (!response.ok) throw new Error('Error al descargar el video');
+                if (!response.ok) throw new Error('Error al descargar');
                 
                 const blob = await response.blob();
                 const transaction = dbOffline.transaction(['videos'], 'readwrite');
                 const objectStore = transaction.objectStore('videos');
                 
-                const request = objectStore.put({ id: idVideo, videoBlob: blob });
+                const request = objectStore.put({ 
+                    id: idVideo, 
+                    videoBlob: blob,
+                    fechaCaducidad: fechaCaducidadCalculada 
+                });
                 
                 request.onsuccess = function() {
-                    console.log("¡Video guardado con éxito en la bóveda!");
+                    console.log("Video asegurado. Reproduciendo...");
                     reproducirDesdeLocal(idVideo);
                 };
             } catch (error) {
-                console.error("Fallo en la descarga:", error);
-                setTimeout(cargarAnuncio, 5000); // Si falla, intenta con otro en 5 seg
+                console.error("Fallo al descargar. Activando emergencia.");
+                activarBucleEmergencia();
             }
+        }
+
+        function renovarSelloDeVida(idVideo, nuevaFechaCaducidad) {
+            const transaction = dbOffline.transaction(['videos'], 'readwrite');
+            const objectStore = transaction.objectStore('videos');
+            const request = objectStore.get(idVideo);
+
+            request.onsuccess = function(event) {
+                const videoData = event.target.result;
+                if (videoData) {
+                    videoData.fechaCaducidad = nuevaFechaCaducidad; 
+                    objectStore.put(videoData); 
+                }
+            };
         }
 
         function reproducirDesdeLocal(idVideo) {
@@ -75,60 +126,132 @@
             request.onsuccess = function(event) {
                 const resultado = event.target.result;
                 if (resultado) {
-                    console.log("Reproduciendo sin internet (desde local)...");
+                    console.log(`Modo Músculo: Reproduciendo -> ${idVideo}`);
                     const videoURL = URL.createObjectURL(resultado.videoBlob);
                     reproductor.src = videoURL;
                     reproductor.play();
+                } else {
+                    activarBucleEmergencia();
                 }
             };
         }
 
         // ==========================================
-        // EL CEREBRO: CARGAR EL ANUNCIO
+        // EL PLAN DE EMERGENCIA CONTRA APAGONES
+        // ==========================================
+        function activarBucleEmergencia() {
+            console.warn("¡ALERTA ROJA! Sin red. Evaluando bóveda local...");
+            const transaction = dbOffline.transaction(['videos'], 'readwrite'); 
+            const objectStore = transaction.objectStore('videos');
+            const request = objectStore.getAll(); 
+
+            request.onsuccess = function(event) {
+                const videos = event.target.result;
+                
+                if (videos && videos.length > 0) {
+                    const AHORA = Date.now();
+                    
+                    const videosValidos = videos.filter(video => {
+                        if (AHORA > video.fechaCaducidad) {
+                            objectStore.delete(video.id); 
+                            console.log(`Conserje (Apagón): Video caducado eliminado -> ${video.id}`);
+                            return false; 
+                        }
+                        return true; 
+                    });
+
+                    if (videosValidos.length > 0) {
+                        const indiceAleatorio = Math.floor(Math.random() * videosValidos.length);
+                        const videoElegido = videosValidos[indiceAleatorio];
+
+                        console.log("Bucle Activo: Proyectando backup válido.");
+                        const videoURL = URL.createObjectURL(videoElegido.videoBlob);
+                        reproductor.src = videoURL;
+                        reproductor.play();
+                    } else {
+                         console.error("Conserje limpió todo. Bóveda vacía. Reintentando red...");
+                         setTimeout(cargarAnuncio, 5000);
+                    }
+                } else {
+                    console.error("Sin internet y bóveda vacía. Reintentando en 5s...");
+                    setTimeout(cargarAnuncio, 5000);
+                }
+            };
+        }
+
+        // ==========================================
+        // EL CEREBRO: CONTACTAR AL SERVIDOR Y LEER XML
         // ==========================================
         async function cargarAnuncio() {
             try {
-                console.log("Solicitando campaña al servidor DCO...");
+                console.log("Contactando a la nave nodriza (Render)...");
                 const respuesta = await fetch(URL_MOTOR);
-                const textoXML = await respuesta.text();
+                
+                if (!respuesta.ok) throw new Error("Servidor no responde");
 
+                const textoXML = await respuesta.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(textoXML, "text/xml");
                 const mediaFile = xmlDoc.getElementsByTagName("MediaFile")[0];
 
                 if (mediaFile) {
                     const videoUrl = mediaFile.textContent.trim();
-                    // Usamos la misma URL como el ID (nombre) del archivo en nuestra bóveda
                     const idVideo = videoUrl;
 
-                    // Vamos a revisar la bóveda primero
+                    let fechaCalculada = null;
+                    const posiblesEtiquetas = ["EndDate", "CampaignEndDate", "ExpirationDate", "Expiration"];
+                    
+                    for (let etiqueta of posiblesEtiquetas) {
+                        const nodo = xmlDoc.getElementsByTagName(etiqueta)[0];
+                        if (nodo && nodo.textContent.trim() !== "") {
+                            const ms = new Date(nodo.textContent.trim()).getTime();
+                            if (!isNaN(ms)) {
+                                fechaCalculada = ms; 
+                                console.log("¡Fecha de caducidad detectada en XML!");
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!fechaCalculada) {
+                        fechaCalculada = Date.now() + (24 * 60 * 60 * 1000); // Regla de 24 horas
+                        console.log("Sin fecha XML. Aplicando escudo estándar de 24 hrs.");
+                    }
+
                     const transaction = dbOffline.transaction(['videos'], 'readonly');
                     const objectStore = transaction.objectStore('videos');
                     const request = objectStore.get(idVideo);
 
                     request.onsuccess = function(event) {
                         if (event.target.result) {
-                            // SI YA ESTÁ GUARDADO
-                            console.log("El video ya está en la bóveda. No gastaremos internet.");
+                            renovarSelloDeVida(idVideo, fechaCalculada);
                             reproducirDesdeLocal(idVideo);
                         } else {
-                            // SI NO ESTÁ GUARDADO
-                            console.log("Video nuevo detectado. Vamos a descargarlo.");
-                            descargarYGuardarVideo(videoUrl, idVideo);
+                            descargarYGuardarVideo(videoUrl, idVideo, fechaCalculada);
                         }
                     };
                 } else {
-                    console.log("No se encontró video en el VAST. Reintentando en 5 segundos...");
+                    console.log("VAST vacío. Reintentando en 5s...");
                     setTimeout(cargarAnuncio, 5000);
                 }
             } catch (error) {
                 console.error("Error de conexión:", error);
-                setTimeout(cargarAnuncio, 5000);
+                activarBucleEmergencia(); 
             }
         }
 
-        // Cuando termine un video, el ciclo vuelve a empezar
-        reproductor.addEventListener('ended', cargarAnuncio);
+        // ==========================================
+        // CICLO INFINITO Y ESTABILIDAD
+        // ==========================================
+        reproductor.addEventListener('ended', () => {
+            URL.revokeObjectURL(reproductor.src); 
+            cargarAnuncio(); 
+        });
+
+        reproductor.addEventListener('error', () => {
+            console.error("El reproductor colapsó. Forzando reinicio del sistema...");
+            setTimeout(() => location.reload(), 3000); 
+        });
 
     </script>
 </body>
